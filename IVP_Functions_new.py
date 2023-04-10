@@ -93,8 +93,8 @@ def initialise_simulation():
 
     # toggle if magnetic or electic fields are wanted
     # toggles between guassian charge (electric) and charged wire (magnetic)
-    # field = 'magnetic'
-    field = 'electric'
+    field = 'magnetic'
+    # field = 'electric'
 
     conditions = (a, k, M, dx, dt, phi, field)
 
@@ -125,6 +125,7 @@ def addChargedParticle(N):
 
     # creating empty cube and finding center coordinate
     cube = np.zeros(shape=(N,N,N))
+
     center_idx = int(N/2)
 
     # adding electric charge in the center of cube
@@ -141,6 +142,7 @@ def addChargedWire(N):
 
     # creating empty cube and finding center coordinate
     cube = np.zeros(shape=(N,N,N))
+
     center_idx = int(N/2)
 
     # adding electric wire to to center of cube
@@ -199,6 +201,7 @@ def charged_cube(N, conditions, PDE, w=0):
         phi_charged = addChargedWire(N)
         phi_charged = pad_edges(phi_charged, field)
 
+
     # counts interations
     iterations = 0
 
@@ -212,8 +215,9 @@ def charged_cube(N, conditions, PDE, w=0):
         new_phi = pad_edges(new_phi, field)
 
         # convergence criteria
-        diff = np.sum(np.abs(new_phi-phi))
-        if (diff < 1e-5): break
+        # diff = np.mean(np.abs(new_phi-phi))
+        # if (diff < 10e-3): break
+        if (np.allclose(new_phi, phi, rtol=1e-9, atol=1e-9)): break   
 
         # counts number of iterations + prints to terminal
         iterations += 1
@@ -235,7 +239,7 @@ def cahn_hilliard(N, conditions, phi0):
     im=plt.imshow(phi0, animated=True)
 
     # number of sweeps and terminal display counter
-    nstep=50000
+    nstep=1000000
     sweeps = 0
 
     data=open(f'Data/hilliard_{N}N_phi{phi_param}.txt','w')
