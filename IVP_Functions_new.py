@@ -215,8 +215,6 @@ def charged_cube(N, conditions, PDE, w=0):
         new_phi = pad_edges(new_phi, field)
 
         # convergence criteria
-        # diff = np.mean(np.abs(new_phi-phi))
-        # if (diff < 10e-3): break
         if (np.allclose(new_phi, phi, rtol=1e-9, atol=1e-9)): break   
 
         # counts number of iterations + prints to terminal

@@ -54,8 +54,8 @@ def main():
         if (PDE=='seidel'): 
 
             data=open(f'Data/seidel_{field}_{N}N_phi{phi}.txt','w')
-            omega_range = np.linspace(0.1, 3, 30) 
-            print(omega_range)
+            omega_range = np.linspace(1, 2, 101) 
+
             for i, w in enumerate(omega_range):
 
                 phi_converged, interation = ivp.charged_cube(N, conditions, PDE, w)
