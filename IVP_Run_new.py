@@ -24,7 +24,7 @@ def main():
 
     # run conditions
     N, phi, conditions, PDE = ivp.initialise_simulation()
-    offset = 0.4
+    offset = 0.1
 
     a, k, M, dx, dt, phi, field = conditions
 
