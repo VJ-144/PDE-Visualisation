@@ -229,17 +229,18 @@ def main():
     N = 100
     dx = 1
 
-    condition = 'electric'
-    data = np.loadtxt(f"Data_good/Jacobi_electricField_100N_phi0.5.txt") 
+    # filename = "Data_good/Jacobi_magneticField_100N_phi0.5.txt"
+    filename = "Data_good/Jacobi_electricField_100N_phi0.5.txt"
 
-    # condition = 'magnetic'
-    # data = np.loadtxt(f"Data_good/Jacobi_magneticField_100N_phi0.5.txt")
+    # sets condition as electric or magnetic data, i.e., charged wire of guassian charge 
+    condition = filename[17:25]
+    data = np.loadtxt(filename) 
 
     # hilliard_freeEnergy()
     # jacobi_field(data, condition)
     # jacobi_slice(data, condition)
     # ExtractRadialData(data, condition)
-    plotRadial(condition)
+    # plotRadial(condition)
 
     return 0
 
