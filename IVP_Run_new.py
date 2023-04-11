@@ -54,13 +54,15 @@ def main():
         if (PDE=='seidel'): 
 
             data=open(f'Data/seidel_{field}_{N}N_phi{phi}.txt','w')
-            omega_range = np.linspace(1, 2, 101) 
+            omega_range = np.arange(1.75, 1.91, 0.01)
+            # omega_range = [1]
+            # print(omega_range)
 
             for i, w in enumerate(omega_range):
 
-                phi_converged, interation = ivp.charged_cube(N, conditions, PDE, w)
+                phi_converged, iteration = ivp.charged_cube(N, conditions, PDE, w)
                 data.write('{0:5.5e} {1:5.5e}\n'.format(iteration, w))
-                print(f'simulation $\omega$={w} at iteration = {iteration}')
+                print(f'simulation omega={w} at iteration = {iteration}')
 
             data.close()
 

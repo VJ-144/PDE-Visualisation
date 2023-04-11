@@ -220,7 +220,28 @@ def hilliard_freeEnergy():
     return 0
 
 
+def plotRelax():
 
+    filename = 'Data/seidel_electric_50N_phi0.0.txt'
+
+    # phi = float(filename[22:25])
+
+    rawData = np.loadtxt(filename)
+    iterations = rawData[:,0]
+    omega = rawData[:,1]
+
+    fig, ax = plt.subplots(1, 1, figsize=(7, 5))
+
+    # setting figure title
+    ax.set_title(fr'Seidel Relaxation, N=50', pad=16)
+    ax.errorbar(omega, iterations, marker='o', markersize = 4, linestyle='', color='black')
+    ax.set_ylabel('iterations [-]')
+    ax.set_xlabel('Omega [-]')
+    # plt.savefig(f'Plots/seidel_electric_{N}N.png')
+    plt.show()
+
+
+    return 0
 
 def main():
 
@@ -241,6 +262,7 @@ def main():
     # jacobi_slice(data, condition)
     # ExtractRadialData(data, condition)
     # plotRadial(condition)
+    plotRelax()
 
     return 0
 

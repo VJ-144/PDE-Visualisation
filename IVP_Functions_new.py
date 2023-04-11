@@ -93,8 +93,8 @@ def initialise_simulation():
 
     # toggle if magnetic or electic fields are wanted
     # toggles between guassian charge (electric) and charged wire (magnetic)
-    field = 'magnetic'
-    # field = 'electric'
+    # field = 'magnetic'
+    field = 'electric'
 
     conditions = (a, k, M, dx, dt, phi, field)
 
@@ -171,16 +171,15 @@ def jacobi_algorithm(phi, conditions, phi_charged):
 def seidel_algorithm(N, phi, phi_charged, w):
 
     old_phi = np.copy(phi)
-    for ijk in itertools.product(range(N), repeat=3):
+    for ijk in itertools.product(range(1, N-1), range(1, N-1), range(1, N-1)):
 
         i, j, k = ijk
 
-        phi_gs = (1/6)*(phi[(i+1)%N, j, k] + phi[i, (j+1)%N, k] + phi[i, j, (k+1)%N] + phi[(i-1)%N, j, k] // 
-        + phi[i, (j-1)%N, k] + phi[i, j, (k-1)%N] + phi_charged[i, j, k])
+        phi_gs = (1/6)*(phi[(i+1), j, k] + phi[i, (j+1), k] + phi[i, j, (k+1)] + phi[(i-1), j, k] + phi[i, (j-1), k] + phi[i, j, (k-1)] + phi_charged[i, j, k])
 
         phi[i,j,k] = w*phi_gs + (1-w)*old_phi[i, j, k]
 
-    return phi
+    return phi, old_phi
 
 
 def charged_cube(N, conditions, PDE, w=0):
@@ -201,28 +200,29 @@ def charged_cube(N, conditions, PDE, w=0):
         phi_charged = addChargedWire(N)
         phi_charged = pad_edges(phi_charged, field)
 
-
     # counts interations
     iterations = 0
 
     # starts self consisten field algorithm
     while True:
-
+        
         if (PDE=='jacobi'): new_phi = jacobi_algorithm(phi, conditions, phi_charged)
-        elif(PDE=='seidel'): new_phi = seidel_algorithm(N, phi, phi_charged, w)
+        elif(PDE=='seidel'): phi, old_phi= seidel_algorithm(N, phi, phi_charged, w)
 
         # pads edges, i.e. enforces boundry conditions dependent on if its a gusassin charge or wire  
-        new_phi = pad_edges(new_phi, field)
+        # new_phi = pad_edges(new_phi, field)
+        new_phi = pad_edges(phi, field)
 
         # convergence criteria
-        if (np.allclose(new_phi, phi, rtol=1e-9, atol=1e-9)): break   
+        dist = np.mean(np.abs(phi - old_phi))
+        if (np.allclose(old_phi, phi, rtol=5e-8, atol=5e-8)): break   
 
         # counts number of iterations + prints to terminal
         iterations += 1
-        print(f'sweeps={iterations}', end='\r')
+        print(f'sweeps={iterations} ', str(dist), end='\r')
 
         # feeds charged cube back into algorithm
-        phi = np.copy(new_phi)
+        # phi = np.copy(new_phi)
 
     return phi, iterations
 
