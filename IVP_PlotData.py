@@ -314,7 +314,7 @@ def hilliard_freeEnergy():
 
 def plotSORS():
 
-    filename = 'Data/seidel_electric_50N_phi0.0.txt'
+    filename = 'Data_good/seidel_electric_50N_phi0.0.txt'
 
     rawData = np.loadtxt(filename)
     iterations = rawData[:,0]
@@ -334,7 +334,7 @@ def plotSORS():
     ax.set_xlabel('$\omega$ [-]')
 
     plt.legend()
-    plt.savefig(f'Plots/seidel_electric_{N}N.png')
+    plt.savefig(f'Plots/seidel_electric_50N.png')
     plt.show()
 
     return 0
@@ -347,8 +347,8 @@ def main():
     dx = 1
 
     # comment/uncomment desired file for plotting
-    filename = "Data_good/Jacobi_magneticField_100N_phi0.5.txt"
-    # filename = "Data_good/Jacobi_electricField_100N_phi0.5.txt"
+    # filename = "Data_good/Jacobi_magneticField_100N_phi0.5.txt"
+    filename = "Data_good/Jacobi_electricField_100N_phi0.5.txt"
 
     # sets condition as electric or magnetic data, i.e., uses point charge or charged wire data
     condition = filename[17:25]
@@ -360,7 +360,7 @@ def main():
     # jacobi_slice(data, condition)
     # ExtractRadialData(data, condition)
     # plotRadial(condition)
-    plotSORS()
+    # plotSORS()
 
     return 0
 
