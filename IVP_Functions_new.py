@@ -66,7 +66,7 @@ def initialise_simulation():
 
     # checks number of command line arguments are correct otherwise stops simulation
     if (len(sys.argv) <= 4 or len(sys.argv) > 5):
-        print("Error! \nFile Input: python IVP_Run.py N Phi")
+        print("Error! \nFile Input: python IVP_Run.py N Phi field")
         sys.exit()
 
     # reads arguments from terminal command line
