@@ -1,11 +1,10 @@
 """
-This file contains all the functions required to run and visualise an implmentation of the Ising Model
-using both Glauber and Kawasaki dynamics. These functions are used to run the simulation in 
-the run.ising.simulation.py file.
+This file contains all the functions required to run checkpoint 3. It contains the functions for the hilliard 
+visualisation and the convergence of a charged cube (point charge or charged wire) using teh jacobi algorithm.
+It also contains testing for the convergence of the optimal omega value
 
-The functions require the existence of the /Data/Glauber and /Data/Kawasaki directories
-to store calculated data and run error analysis. The directory names are spelling and case sensitive.
-
+The functions require the existence of the /Data/ and /Plots/ directories to store calculated 
+data and run error analysis. The directory names are spelling and case sensitive.
 """
 
 import datetime
@@ -66,22 +65,35 @@ def initialise_simulation():
     """
 
     # checks number of command line arguments are correct otherwise stops simulation
-    if (len(sys.argv) <= 3 or len(sys.argv) > 4):
+    if (len(sys.argv) <= 4 or len(sys.argv) > 5):
         print("Error! \nFile Input: python IVP_Run.py N Phi")
         sys.exit()
 
+    # reads arguments from terminal command line
     N=int(sys.argv[1]) 
     phi=float(sys.argv[2])
     PDE=str(sys.argv[3])
+    field=str(sys.argv[4])
 
-    # check if algorithm is valid
+    # check if algorithm name from terminal  is valid
     valid_algorithm = False
     if (PDE=="jacobi" ): valid_algorithm = True
     elif (PDE=="hilliard"): valid_algorithm = True
     elif (PDE=="seidel"): valid_algorithm = True
 
+    # ends program if algorithm in invalid
     if (valid_algorithm == False):
-        print("Error! \nInvalid PDE Method Parameter, choose from:\n1--hilliard\n2--jacobi\n3--seidel")
+        print("Error! \nInvalid PDE Algorithm Parameter, choose from:\n1--hilliard\n2--jacobi\n3--seidel")
+        sys.exit()
+
+
+    valid_field = False
+    if (field=="electric" ): valid_field = True
+    elif (field=="magnetic"): valid_field = True
+
+    # ends program if algorithm in invalid
+    if (field == False):
+        print("Error! \nInvalid field Parameter, choose from:\n1--electric\n2--magnetic")
         sys.exit()
 
     # simulation constants hard coded
@@ -91,10 +103,9 @@ def initialise_simulation():
     dx = 1
     dt = 1
 
-    # toggle if magnetic or electic fields are wanted
-    # toggles between guassian charge (electric) and charged wire (magnetic)
+    # toggles between point charge (electric) and charged wire (magnetic)
     # field = 'magnetic'
-    field = 'electric'
+    # field = 'electric'
 
     conditions = (a, k, M, dx, dt, phi, field)
 
@@ -112,7 +123,7 @@ def pad_edges(cube, field):
     cube[[0,-1], :, :]=0
     cube[:, [0,-1], :]=0
 
-    # sets Z cube edge to zero if simulation is a guassian charge
+    # sets Z cube edge to zero if simulation is a point charge
     if (field=='electric'): cube[:, :, [0,-1]]=0
 
     # returns cube with boundry counditions
@@ -153,6 +164,9 @@ def addChargedWire(N):
 
 
 def jacobi_algorithm(phi, conditions, phi_charged):
+    """
+    updates 3D charged cube using jacobi algorithm
+    """
 
     # extracts all simulation constants and parameters
     a, k, M, dx, dt, phi_param, field = conditions
@@ -168,23 +182,42 @@ def jacobi_algorithm(phi, conditions, phi_charged):
     return new_phi
 
 
-def seidel_algorithm(N, phi, phi_charged, w):
+def seidel_algorithm(N, phi, phi_charged, w, field):
+    """
+    updates 3D charged cube using seidel algorithm
+    """
 
+    if (field=='electric'): z_lowBnd, z_highDnd = 1, N-1
+    elif (field=='magnetic'): z_lowBnd, z_highDnd = 0, N
+
+
+    # keeps a copy of old phi before update
     old_phi = np.copy(phi)
-    for ijk in itertools.product(range(1, N-1), range(1, N-1), range(1, N-1)):
+
+    # updating phi charged cube 
+    for ijk in itertools.product(range(1, N-1), range(1, N-1), range(z_lowBnd, z_highDnd)):
 
         i, j, k = ijk
 
-        phi_gs = (1/6)*(phi[(i+1), j, k] + phi[i, (j+1), k] + phi[i, j, (k+1)] + phi[(i-1), j, k] + phi[i, (j-1), k] + phi[i, j, (k-1)] + phi_charged[i, j, k])
+        if (field=='electric'):
+            phi_gs = (1/6)*(phi[(i+1), j, k] + phi[i, (j+1), k] + phi[i, j, (k+1)] + phi[(i-1), j, k]  \
+            + phi[i, (j-1), k] + phi[i, j, (k-1)] + phi_charged[i, j, k])
+
+        # magnetic requires the treatment of different boundry conditions
+        if (field=='magnetic'):
+            phi_gs = (1/6)*(phi[(i+1), j, k] + phi[i, (j+1), k] + phi[i, j, (k+1)%N] + phi[(i-1), j, k]  \
+            + phi[i, (j-1), k] + phi[i, j, (k-1)%N] + phi_charged[i, j, k])
 
         phi[i,j,k] = w*phi_gs + (1-w)*old_phi[i, j, k]
 
+    # return updated and old phi
     return phi, old_phi
 
 
-def charged_cube(N, conditions, PDE, w=0):
+def jacobi_converge(N, conditions):
     """
-    Creates a 3D cube of set size (N) and places charges wire in it
+    Creates a 3D cube of set size (N) with a point charge or charged wire and 
+    converges the potential field generated using jacobi algorithm
     """
 
     # extracts all simulation constants and parameters
@@ -206,24 +239,69 @@ def charged_cube(N, conditions, PDE, w=0):
     # starts self consisten field algorithm
     while True:
         
-        if (PDE=='jacobi'): new_phi = jacobi_algorithm(phi, conditions, phi_charged)
-        elif(PDE=='seidel'): phi, old_phi= seidel_algorithm(N, phi, phi_charged, w)
+        # update charged cube using jacobi algorithm
+        new_phi = jacobi_algorithm(phi, conditions, phi_charged)
 
         # pads edges, i.e. enforces boundry conditions dependent on if its a gusassin charge or wire  
-        # new_phi = pad_edges(new_phi, field)
-        new_phi = pad_edges(phi, field)
+        new_phi = pad_edges(new_phi, field)
 
         # convergence criteria
-        dist = np.mean(np.abs(phi - old_phi))
-        if (np.allclose(old_phi, phi, rtol=5e-8, atol=5e-8)): break   
+        diff = np.sum(np.abs(new_phi - phi))
+        if (np.allclose(new_phi, phi, rtol=5e-8, atol=5e-8)): break   
 
         # counts number of iterations + prints to terminal
         iterations += 1
-        print(f'sweeps={iterations} ', str(dist), end='\r')
+        print(f'sweeps={iterations}, update difference={diff}', end='\r')
 
         # feeds charged cube back into algorithm
-        # phi = np.copy(new_phi)
+        phi = np.copy(new_phi)
 
+    # returns converged phi and number of iterations for convergence
+    return phi, iterations
+
+
+def seidel_converge(N, conditions, w):
+    """
+    Creates a 3D cube of set size (N) with a point charge only and 
+    converges the potential field generated using seidel algorithm
+    """
+
+    # extracts all simulation constants and parameters
+    a, k, M, dx, dt, phi_param, field = conditions
+
+    # creates initial empty simulation cube - phi
+    phi = np.zeros(shape=(N,N,N))
+
+    # creates a new cube with either a guassian charge or chared wire + pads edges
+    if (field=='electric'):
+        phi_charged = addChargedParticle(N)
+    elif (field=='magnetic'):
+        phi_charged = addChargedWire(N)
+        phi_charged = pad_edges(phi_charged, field)
+
+    # counts interations
+    iterations = 0
+
+    # starts self consisten field algorithm
+    while True:
+        
+        # using guass-seidel algorithm for update rule
+        phi, old_phi= seidel_algorithm(N, phi, phi_charged, w, field)
+
+        # pads edges, i.e. enforces boundry conditions dependent on if its a point charge or charged wire  
+        phi = pad_edges(phi, field)
+
+        # convergence criteria
+        diff = np.sum(np.abs(phi - old_phi))
+        if (np.allclose(old_phi, phi, rtol=1e-8, atol=1e-8)): break   
+
+        # counts number of iterations + prints to terminal
+        iterations += 1
+        print(f'sweeps={iterations}, update difference={diff}', end='\r')
+
+        # phi is fed back into the algorithm and becomes phi_old, and a new updated version is generated called the phi
+
+    # returns converged charged cube and numer of iterations for convergence
     return phi, iterations
 
 
@@ -270,9 +348,10 @@ def cahn_hilliard(N, conditions, phi0):
             plt.draw()
             plt.pause(0.0001) 
 
-            # saving time and free energy density data
+            # calculating free energy density
             energy_density = freeEnergy(phi0, N, conditions)
 
+            # saving time and free energy density data
             data.write('{0:5.5e} {1:5.5e}\n'.format(sweeps, energy_density))
 
     data.close()
