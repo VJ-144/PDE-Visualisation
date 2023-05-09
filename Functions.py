@@ -19,43 +19,20 @@ import matplotlib.pyplot as plt
 import matplotlib.animation as animation
 
 
-def Laplacian(phi0, N, conditions):
+def Laplacian(phi0):
     """
     Calculates the laplacian of the 3D cube passed to it
     """
 
-    # extract neccesary system parameters
-    a, k, M, dx, dt, phi_param, field = conditions
-
     # calculates laplacian Y and X componets for full matrix + center all correction
-    yGrad_comp = np.roll(phi0, -1, axis =0) + np.roll(phi0, 1, axis=0)
-    xGrad_comp = np.roll(phi0, -1, axis =1) + np.roll(phi0, 1, axis =1)
+    yGrad_comp = np.roll(phi0, -1, axis=0) + np.roll(phi0, 1, axis=0)
+    xGrad_comp = np.roll(phi0, -1, axis=1) + np.roll(phi0, 1, axis=1)
     center_corr = -4 * phi0
 
     # calculates laplacian
     laplacian = yGrad_comp + xGrad_comp + center_corr
 
     return laplacian
-
-
-def freeEnergy(phi0, N, conditions):
-    """
-    Calculates the free energy density for 3D cube passed to it
-    """
-
-    # extract neccesary system parameters
-    a, k, M, dx, dt, phi_param, field = conditions
-
-    # calculates laplacian Y and X componets for nabla + combines them for full expression
-    yGrad_comp = ( np.roll(phi0, -1, axis =0) - np.roll(phi0, 1, axis=0) ) 
-    xGrad_comp = ( np.roll(phi0, -1, axis =1) - np.roll(phi0, 1, axis =1) ) 
-    grad_phi = (yGrad_comp/2*dx)**2 + (xGrad_comp/2*dx)**2
-
-    # calculates free energy density matix
-    E_density = -(a/2) * phi0**2 + (a/4) * phi0**4 + (k/2) * grad_phi
-
-    # returns total free energy density
-    return np.sum(E_density)
 
 
 
@@ -65,278 +42,134 @@ def initialise_simulation():
     """
 
     # checks number of command line arguments are correct otherwise stops simulation
-    # if (len(sys.argv) <= 4 or len(sys.argv) > 5):
-    #     print("Error! \nFile Input: python IVP_Run.py N Phi field")
-    #     sys.exit()
+    if (len(sys.argv) < 5 or len(sys.argv) > 6):
+        print("Error! \nFile Input: python RunCode.py N omega kappa v0 Algorithm")
+        sys.exit()
 
     # reads arguments from terminal command line
     N=int(sys.argv[1]) 
-    D=float(sys.argv[2])
-    p=float(sys.argv[3])
-    q=float(sys.argv[4])
+    omega=float(sys.argv[2])
+    kappa=float(sys.argv[3])
+    v0 = float(sys.argv[4])
+    algorithm = str(sys.argv[5])
 
+    # ends program if incorrect algorithm is input
+    valid_algorithm = True
+    if (algorithm=='standard'): valid_algorithm=False
+    elif (algorithm=='velocity'): valid_algorithm=False
+    if (valid_algorithm):
+        print('Error: invalid algorithm input')
+        sys.exit()
 
-    # check if algorithm name from terminal  is valid
-    # valid_algorithm = False
-    # if (PDE=="jacobi" ): valid_algorithm = True
-    # elif (PDE=="hilliard"): valid_algorithm = True
-    # elif (PDE=="seidel"): valid_algorithm = True
-
-    # ends program if algorithm in invalid
-    # if (valid_algorithm == False):
-    #     print("Error! \nInvalid PDE Algorithm Parameter, choose from:\n1--hilliard\n2--jacobi\n3--seidel")
-    #     sys.exit()
-
-
-
-
-    conditions = (D, p, q)
+    conditions = (omega, kappa, v0, algorithm)
 
     # returns all imporant simulation parameters
     return N, conditions
 
 
 
-def pad_edges(cube, field):
-    """
-    Pads edges of cube passed to it and makes them all zero, i.e., sets boundry conditions.
-    """
+def source_matrix(omega, N):
 
-    # sets X and Y cube edges to zero
-    cube[[0,-1], :, :]=0
-    cube[:, [0,-1], :]=0
+    # initial positiona/source matrix
+    rho = np.zeros(shape=(N,N), dtype=float)
 
-    # sets Z cube edge to zero if simulation is a point charge
-    if (field=='electric'): cube[:, :, [0,-1]]=0
+    half_size = int(N/2)
 
-    # returns cube with boundry counditions
-    return cube
+    # calculates all radius and all source matrix elements
+    for ij in itertools.product(range(N), repeat=2):
 
-def addChargedParticle(N):
-    """
-    Creates a 3D cube of set size (N) and places gussian charge in it
-    """
+        i,j =ij
 
-    # creating empty cube and finding center coordinate
-    cube = np.zeros(shape=(N,N,N))
+        # calculate radius vector coordinates
+        xx = np.abs(i-half_size)
+        yy = np.abs(j-half_size)
 
-    center_idx = int(N/2)
+        # calcuating radius magnitude
+        Radius = np.sqrt(xx**2 + yy**2)
 
-    # adding electric charge in the center of cube
-    cube[center_idx, center_idx, center_idx] = 1
+        rho[i,j] = np.exp( -(Radius**2)/(omega**2) )
 
-    # returning cube with gussian charge
-    return cube
+    return rho
 
+def vel_dependence(v0, N, dx):
 
-def addChargedWire(N):
-    """
-    Creates a 3D cube of set size (N) and places charges wire in it
-    """
+    vel_mat = np.zeros(shape=(N,N), dtype=float)
 
-    # creating empty cube and finding center coordinate
-    cube = np.zeros(shape=(N,N,N))
+    half_size = int(N/2)
 
-    center_idx = int(N/2)
+    # calculates all contributions of velocity adjustment to algorithm
+    for ij in itertools.product(range(N), repeat=2):
 
-    # adding electric wire to to center of cube
-    cube[center_idx, center_idx,:] = 1
+        i,j = ij
 
-    # returns cube with charged wire through the center
-    return cube
+        # calculate radius vector coordinates
+        xx = np.abs(i-half_size)
+        yy = np.abs(j-half_size)
 
+        factor = -v0 * np.sin((2*np.pi*yy)/N)/2*dx
 
-def jacobi_algorithm(phi, conditions, phi_charged):
-    """
-    updates 3D charged cube using jacobi algorithm
-    """
+        vel_mat[i,j] = factor
 
-    # extracts all simulation constants and parameters
-    a, k, M, dx, dt, phi_param, field = conditions
+    return vel_mat
 
-    # Jacobi algorithm 
-    xGrad_comp = np.roll(phi, 1, axis=0) + np.roll(phi, -1, axis=0)
-    yGrad_comp = np.roll(phi, 1, axis=1) + np.roll(phi, -1, axis=1)
-    zGrad_comp = np.roll(phi, 1, axis=2) + np.roll(phi, -1, axis=2)
-    rho = phi_charged * dx**2
-
-    new_phi = (1/6) * (xGrad_comp + yGrad_comp + zGrad_comp + rho)
-
-    return new_phi
-
-
-def seidel_algorithm(N, phi, phi_charged, w, field):
-    """
-    updates 3D charged cube using seidel algorithm
-    """
-
-    if (field=='electric'): z_lowBnd, z_highDnd = 1, N-1
-    elif (field=='magnetic'): z_lowBnd, z_highDnd = 0, N
-
-
-    # keeps a copy of old phi before update
-    old_phi = np.copy(phi)
-
-    # updating phi charged cube 
-    for ijk in itertools.product(range(1, N-1), range(1, N-1), range(z_lowBnd, z_highDnd)):
-
-        i, j, k = ijk
-
-        if (field=='electric'):
-            phi_gs = (1/6)*(phi[(i+1), j, k] + phi[i, (j+1), k] + phi[i, j, (k+1)] + phi[(i-1), j, k]  \
-            + phi[i, (j-1), k] + phi[i, j, (k-1)] + phi_charged[i, j, k])
-
-        # magnetic requires the treatment of different boundry conditions
-        if (field=='magnetic'):
-            phi_gs = (1/6)*(phi[(i+1), j, k] + phi[i, (j+1), k] + phi[i, j, (k+1)%N] + phi[(i-1), j, k]  \
-            + phi[i, (j-1), k] + phi[i, j, (k-1)%N] + phi_charged[i, j, k])
-
-        phi[i,j,k] = w*phi_gs + (1-w)*old_phi[i, j, k]
-
-    # return updated and old phi
-    return phi, old_phi
-
-
-def jacobi_converge(N, conditions):
-    """
-    Creates a 3D cube of set size (N) with a point charge or charged wire and 
-    converges the potential field generated using jacobi algorithm
-    """
-
-    # extracts all simulation constants and parameters
-    a, k, M, dx, dt, phi_param, field = conditions
-
-    # creates initial empty simulation cube - phi
-    phi = np.zeros(shape=(N,N,N))
-
-    # creates a new cube with either a guassian charge or chared wire + pads edges
-    if (field=='electric'):
-        phi_charged = addChargedParticle(N)
-    elif (field=='magnetic'):
-        phi_charged = addChargedWire(N)
-        phi_charged = pad_edges(phi_charged, field)
-
-    # counts interations
-    iterations = 0
-
-    # starts self consisten field algorithm
-    while True:
-        
-        # update charged cube using jacobi algorithm
-        new_phi = jacobi_algorithm(phi, conditions, phi_charged)
-
-        # pads edges, i.e. enforces boundry conditions dependent on if its a gusassin charge or wire  
-        new_phi = pad_edges(new_phi, field)
-
-        # convergence criteria
-        diff = np.sum(np.abs(new_phi - phi))
-        if (np.allclose(new_phi, phi, rtol=5e-8, atol=5e-8)): break   
-
-        # counts number of iterations + prints to terminal
-        iterations += 1
-        print(f'sweeps={iterations}, update difference={diff}', end='\r')
-
-        # feeds charged cube back into algorithm
-        phi = np.copy(new_phi)
-
-    # returns converged phi and number of iterations for convergence
-    return phi, iterations
-
-
-def seidel_converge(N, conditions, w):
-    """
-    Creates a 3D cube of set size (N) with a point charge only and 
-    converges the potential field generated using seidel algorithm
-    """
-
-    # extracts all simulation constants and parameters
-    a, k, M, dx, dt, phi_param, field = conditions
-
-    # creates initial empty simulation cube - phi
-    phi = np.zeros(shape=(N,N,N))
-
-    # creates a new cube with either a guassian charge or chared wire + pads edges
-    if (field=='electric'):
-        phi_charged = addChargedParticle(N)
-    elif (field=='magnetic'):
-        phi_charged = addChargedWire(N)
-        phi_charged = pad_edges(phi_charged, field)
-
-    # counts interations
-    iterations = 0
-
-    # starts self consisten field algorithm
-    while True:
-        
-        # using guass-seidel algorithm for update rule
-        phi, old_phi= seidel_algorithm(N, phi, phi_charged, w, field)
-
-        # pads edges, i.e. enforces boundry conditions dependent on if its a point charge or charged wire  
-        phi = pad_edges(phi, field)
-
-        # convergence criteria
-        diff = np.sum(np.abs(phi - old_phi))
-        if (np.allclose(old_phi, phi, rtol=1e-8, atol=1e-8)): break   
-
-        # counts number of iterations + prints to terminal
-        iterations += 1
-        print(f'sweeps={iterations}, update difference={diff}', end='\r')
-
-        # phi is fed back into the algorithm and becomes phi_old, and a new updated version is generated called the phi
-
-    # returns converged charged cube and numer of iterations for convergence
-    return phi, iterations
-
-
-def cahn_hilliard(N, conditions, phi0):
+def diff_equation(N, conditions, phi0, nstep):
 
     # extracting constant parameters
-    D, p, q = conditions
+    omega, kappa, v0, algorithm = conditions
+
+    # they must converge based on the condition: dt/dx < 1/2
+    dt=0.2
+    dx=1
+    D=1
 
     # setting up animantion figure
     fig = plt.figure()
     im=plt.imshow(phi0, animated=True)
 
     # number of sweeps and terminal display counter
-    nstep=1000000
     sweeps = 0
 
-    # data=open(f'Data/hilliard_{N}N_phi{phi_param}.txt','w')
+    # calculate position vector squared
+    rho = source_matrix(omega, N)
+
+    data=open(f'Data/{algorithm}Diffusion_Evol_{N}N_omega{omega}_kappa{kappa}_time{nstep}_v0{v0}.txt','w')
+
+    # calculates contribution to algorithm for velocity dependence
+    algorithm_factor = 0
+    if (algorithm=='velocity'): vel = vel_dependence(v0, N, dx)
 
     for n in range(nstep):
 
-        # calculating laplacian with loop or np.roll
-        # laplacian_phi = Laplacian(phi0, N, conditions)
+        # calculating laplacian with np.roll
+        laplacian_phi0 = Laplacian(phi0)
 
-        # # calculating chemical potential matrix
-        # chem_matrix = -a * phi0 + a * phi0**3 - k * laplacian_phi            
+        # calculating new factor based on velocity algorithm
+        if (algorithm=='velocity'): algorithm_factor = vel * (np.roll(phi0, -1, axis=1) - np.roll(phi0, 1, axis=1))
 
-        # # calculating laplacian of chemical potential
-        # laplacian_chem = Laplacian(chem_matrix, N, conditions)
+        phi0_new = phi0 + ((dt*D)/dx**2) * laplacian_phi0 + (dt * rho) - (dt * kappa * phi0) + algorithm_factor
 
-        # # calculating new d(phi) = M*dt*c*laplancian
-        # phi0 += (((M*dt)/(dx**2))*laplacian_chem)
-
+        # feeding phi back into algorithm
+        phi0 = phi0_new.copy()
 
         # visuals in set number of sweeps
-        if(n%1==0): 
+        if(n%10==0): 
 
             # prints current number of sweep to terminal
-            sweeps += 1
+            sweeps += 10
             print(f'sweeps={sweeps}', end='\r')
 
             # animates configuration 
             plt.cla()
-            im=plt.imshow(phi0, interpolation='gaussian', animated=True)
+            im=plt.imshow(phi0, animated=True)
             plt.draw()
             plt.pause(0.0001) 
 
-            # calculating free energy density
-            # energy_density = freeEnergy(phi0, N, conditions)
+            # calculating average
+            phi0_avg = np.mean(phi0)
 
             # saving time and free energy density data
-            # data.write('{0:5.5e} {1:5.5e}\n'.format(sweeps, energy_density))
+            data.write('{0:5.5e} {1:5.5e}\n'.format(sweeps, phi0_avg))
 
-    # data.close()
+    data.close()
 
     return phi0
