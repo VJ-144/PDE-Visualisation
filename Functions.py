@@ -102,11 +102,7 @@ def vel_dependence(v0, N, dx):
 
         i,j = ij
 
-        # calculate radius vector coordinates
-        xx = np.abs(i-half_size)
-        yy = np.abs(j-half_size)
-
-        factor = -v0 * np.sin((2*np.pi*yy)/N)/2*dx
+        factor = -v0 * np.sin((2*np.pi*i)/N)/2*dx
 
         vel_mat[i,j] = factor
 
@@ -146,7 +142,7 @@ def diff_equation(N, conditions, phi0, nstep):
         # calculating new factor based on velocity algorithm
         if (algorithm=='velocity'): algorithm_factor = vel * (np.roll(phi0, -1, axis=1) - np.roll(phi0, 1, axis=1))
 
-        phi0_new = phi0 + ((dt*D)/dx**2) * laplacian_phi0 + (dt * rho) - (dt * kappa * phi0) + algorithm_factor
+        phi0_new = phi0 + ((dt*D)/dx**2) * laplacian_phi0 + (dt * rho) - (dt * kappa * phi0) - dt*algorithm_factor
 
         # feeding phi back into algorithm
         phi0 = phi0_new.copy()
