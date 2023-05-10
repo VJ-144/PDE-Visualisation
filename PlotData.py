@@ -41,19 +41,7 @@ def Grad(phi, dx, total=False):
     if (total==True): return -xGrad_comp, -yGrad_comp, -zGrad_comp
 
     return -xGrad_comp/normailse, -yGrad_comp/normailse, -zGrad_comp/normailse
-
-
-def Curl(phi, dx, total=False):
-    center = int(N/2)
-    xCurl_comp = (np.roll(phi, -1, axis=0) - np.roll(phi, 1, axis=0))[:, :, center] / (2*dx)
-    yCurl_comp = (np.roll(phi, -1, axis=1) - np.roll(phi, 1, axis=1))[:, :, center] / (2*dx)
-    zCurl_comp = (np.roll(phi, -1, axis=2) - np.roll(phi, 1, axis=2))[:, :, center] / (2*dx)
-
-    normailse = np.sqrt(xCurl_comp**2 + yCurl_comp**2 + zCurl_comp**2)
-
-    if (total==True): return xCurl_comp, -yCurl_comp, zCurl_comp
-
-    return xCurl_comp/normailse, -yCurl_comp/normailse, zCurl_comp/normailse
+    
 
 def ExtractRadialData(data, condition):
 
