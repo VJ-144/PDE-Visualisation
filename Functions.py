@@ -41,25 +41,24 @@ def initialise_simulation():
     Sets up all parameters for the simulation + reads arguments from terminal
     """
 
-    # checks number of command line arguments are correct otherwise stops simulation
-    if (len(sys.argv) < 5 or len(sys.argv) > 6):
-        print("Error! \nFile Input: python RunCode.py N omega kappa v0 Algorithm")
-        sys.exit()
+    # # checks number of command line arguments are correct otherwise stops simulation
+    # if (len(sys.argv) < 5 or len(sys.argv) > 6):
+    #     print("Error! \nFile Input: python RunCode.py N omega kappa v0 Algorithm")
+    #     sys.exit()
 
     # reads arguments from terminal command line
     N=int(sys.argv[1]) 
     omega=float(sys.argv[2])
     kappa=float(sys.argv[3])
-    v0 = float(sys.argv[4])
-    algorithm = str(sys.argv[5])
 
-    # ends program if incorrect algorithm is input
-    valid_algorithm = True
-    if (algorithm=='standard'): valid_algorithm=False
-    elif (algorithm=='velocity'): valid_algorithm=False
-    if (valid_algorithm):
-        print('Error: invalid algorithm input')
-        sys.exit()
+
+    # # ends program if incorrect algorithm is input
+    # valid_algorithm = True
+    # if (algorithm=='standard'): valid_algorithm=False
+    # elif (algorithm=='velocity'): valid_algorithm=False
+    # if (valid_algorithm):
+    #     print('Error: invalid algorithm input')
+    #     sys.exit()
 
     conditions = (omega, kappa, v0, algorithm)
 
