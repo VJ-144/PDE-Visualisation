@@ -29,326 +29,179 @@ import matplotlib.pyplot as plt
 from scipy.optimize import curve_fit
 from sklearn.preprocessing import MinMaxScaler
 from mpl_toolkits.axes_grid1 import make_axes_locatable
+from matplotlib.colors import ListedColormap
+from scipy.signal import find_peaks
 
-def Grad(phi, dx, total=False):
-    center = int(N/2)
-    xGrad_comp = (np.roll(phi, -1, axis=2) - np.roll(phi, 1, axis=2))[center, :, :] / (2*dx)
-    yGrad_comp = (np.roll(phi, -1, axis=1) - np.roll(phi, 1, axis=1))[center, :, :] / (2*dx)
-    zGrad_comp = (np.roll(phi, -1, axis=0) - np.roll(phi, 1, axis=0))[center, :, :] / (2*dx)
+def correlation_prob(tao):
 
-    normailse = np.sqrt(xGrad_comp**2 + yGrad_comp**2 + zGrad_comp**2)
+    correlation_1 = np.zeros(shape=(int(N/2)))
+    correlation_2 = np.zeros(shape=(int(N/2)))
 
-    if (total==True): return -xGrad_comp, -yGrad_comp, -zGrad_comp
+    # diff_list = []
 
-    return -xGrad_comp/normailse, -yGrad_comp/normailse, -zGrad_comp/normailse
-    
+    for ijk in itertools.product(range(int(N/2)), repeat=3):
 
-def ExtractRadialData(data, condition):
+        k,i,j = ijk
 
-    # reshaping stored 2D matrix data back into 3D matrix
-    phi = data.reshape(N, N, N)
-    half_size = int(N/2)
+        cell1 = tao[i,k]
+        cell2 = tao[j,k]
 
-    # obtaining slice of 3D matrix to calculate radial dependence
-    phi_slice = phi[:, :, half_size]
+        diff = np.abs(j - i)
+        # diff_list.append(diff)
 
-    # file to store calculated data
-    data=open(f'Data/Radius_{condition}_Dependence_{N}N.txt','w')
+        if (cell1==cell2):
+            correlation_1[diff] +=1
+            correlation_2[diff] +=1
 
-    # counts iterations
-    iteration=0
-    
-    # calculates appropriate field for point charge or charged wire
-    if (condition=='electric'): x, y, z = Grad(phi, dx, total=True)
-    elif (condition=='magnetic'): x, y, z = Curl(phi, dx, total=True)
-    
-    # iterating over 2D sliced matrix
-    for ij in itertools.product(range(N), repeat=2):
 
-        i, j = ij
-
-        # calculate radius vector coordinates
-        xx = np.abs(i-half_size)
-        yy = np.abs(j-half_size)
-
-        # calcuating radius magnitude
-        Radius = np.sqrt(xx**2 + yy**2)
-
-        # calculating potential at that point
-        potential = phi_slice[i, j]
-     
-        # calculating electic or magnetic field
-        field_idx = np.sqrt(x[i, j]**2 + y[i, j]**2)
-
-        # storing radius, potential feild strength and electic/magnetic field strength
-        data.write('{0:5.5e} {1:10.10e} {2:10.10e}\n'.format(Radius, potential, field_idx))
-
-        iteration+=1
-        print(f'iteration={iteration}', end='\r')        
-
-    # close data file
-    data.close()
-
-    return 0
-
-# line for fitting
-def line(x, m, c):
-    return m * x + c
-
-def plotRadial(condition):
-
-    # reading in data with radial dependence of potential strength and electric or magnetic field strength
-    data = np.loadtxt(f'Data_good/Radius_{condition}_Dependence_100N.txt')
-
-    # settign appropriate title names
-    if (condition=='magnetic'): charge_title='Charged Wire'
-    elif (condition=='electric'): charge_title='Point Charge'
-
-    # reading in data for radius and electric/magnetic field strength
-    radius = data[:,0]
-    potential = data[:,1]
-    electric = data[:,2]
-
-    # sortind data into acending order
-    order_idx = np.argsort(electric)
-
-    radius = radius[order_idx]
-    potential = potential[order_idx]
-    electric = electric[order_idx]
-
-    # setting up plot of potential and field strength
-    fig, (ax1, ax2) = plt.subplots(1,2, figsize=(10,4))
-    fig.suptitle(f'{charge_title} Radial Dependence Analysis, N={N}', fontsize=16)
-    plt.subplots_adjust(top=0.8, wspace=0.4, hspace=0.4)
-    
-    # conditions for plotting electric field of point charge
-    if (condition=='electric'): 
-        
-        # plotting log(x) vs log(y) point charge potential data
-        ax1.plot(np.log(radius), np.log(potential), marker='x', ls='')
-        
-        # line of best fit in data subset
-        # 9900:10000 index gives m1=1.08 but covers shorter range, 9000:10000 index gives m1=1.19 but convers range 1-3
-        popt1, pcov1 = curve_fit(line, np.log(radius)[9900:10000], np.log(potential)[9900:10000])
-        m1, c1 = popt1
-
-        # plotting
-        ax1.set_title(f'{charge_title} Potential')
-        ax1.set_xlabel('Log Radius - ln(R)')
-        ax1.set_ylabel('Log Potential Field Strength - ln(P)')
-
-    # conditions for plotting magnetic field of charged wire
-    if (condition=='magnetic'): 
-
-        # plotting log(x) vs y point charge potential data
-        ax1.plot(np.log(radius), potential, marker='x', ls='')
-
-        # line of best fit in data subset
-        popt1, pcov1 = curve_fit(line, np.log(radius)[8500:9980], potential[8500:9980])
-        m1, c1 = popt1
-
-        # plotting
-        ax1.set_title(f'{charge_title} Potential')
-        ax1.set_xlabel('Log Radius - ln(R)')
-        ax1.set_ylabel('Potential Field Strength - P')
-
-    # line of best fit for electric/magnetic field data
-    popt2, pcov2 = curve_fit(line, np.log(radius)[8500:9980], np.log(electric)[8500:9980])
-    m2, c2 = popt2
-
-    xfit = np.linspace(0, 4, 100)
-
-    # ploting electric/magnetic field data and lines of best fit
-    ax2.plot(np.log(radius), np.log(electric), marker='x', ls='')
-    ax2.plot(xfit, line(xfit, m2, c2), marker='', ls='-', color='black', label=f'm = {np.round(m2,2)}')
-    ax1.plot(xfit, line(xfit, m1, c1), marker='', ls='-', color='black', label=f'm = {np.round(m1,2)}')
-
-    # plotting + titles
-    ax2.set_title(f'{charge_title} {condition} Field Strength')
-    ax2.set_xlabel('Log Radius - ln(R)')
-    ax2.set_ylabel(f'Log {condition} Field Strength - ln(E)')
-
-    ax1.legend()
-    ax2.legend()
-
-    # save plots
-    plt.savefig(f'Plots/RadiusDep_{condition}_{N}N.png')
-    plt.show()
-
-    return 0 
-
-def jacobi_slice(data, condition):
-
-    # reshaping stored 2D matrix data back into 3D matrix
-    phi = data.reshape(N, N, N)
-    half_size = int(N/2)
-
-    # plots both XY and ZY plane for charged wire
-    if (condition=='magnetic'): 
-
-        charge_title='Charged Wire'
-        
-        # set ups two plots
-        fig, (ax1, ax2) = plt.subplots(1,2, figsize=(10,4))
-        fig.suptitle(f'{charge_title} Slice Potential Strength, N={N}', fontsize=16)
-        plt.subplots_adjust(top=0.8, wspace=0.1, hspace=0.4)
-
-        # ploting charged wire ZY plane
-        ax1.set_title(f'ZY Plane')
-        ax1.imshow(phi[:, half_size, :], cmap='gnuplot')
-        ax1.set_xlabel('Z-Axis')
-        ax1.set_ylabel('Y-Axis')
-
-        # ploting charged wire XY plane
-        ax2.set_title(f'XY Plane')
-        im = ax2.imshow(phi[:, :, half_size], cmap='gnuplot')
-        ax2.set_xlabel('X-Axis')
-        ax2.set_ylabel('Y-Axis')
-
-        # ploting color bars for both plots
-        divider1 = make_axes_locatable(ax1)
-        cax1 = divider1.append_axes("right", size="5%", pad=0.05)
-
-        divider2 = make_axes_locatable(ax2)
-        cax2 = divider2.append_axes("right", size="5%", pad=0.05)
-
-        plt.colorbar(im, cax=cax1)
-        plt.colorbar(im, cax=cax2)
-
-    # plots XY plane for charged point
-    elif (condition=='electric'): 
-
-        charge_title='Point Charge'
-
-        # set ups single plot
-        fig, ax1 = plt.subplots()
-        fig.suptitle(f'{charge_title} Potential Slice, N={N}', fontsize=15)
-        plt.subplots_adjust(top=0.85, wspace=0.4, hspace=0.4)
-
-        # ploting point charge XY plane
-        ax1.set_title(f'XY Plane')
-        im = ax1.imshow(phi[:, half_size, :], cmap='gnuplot')
-        ax1.set_xlabel('X-Axis')
-        ax1.set_ylabel('Y-Axis')
-
-        # ploting color bar for plot
-        divider = make_axes_locatable(ax1)
-        cax = divider.append_axes("right", size="5%", pad=0.05)
-
-        plt.colorbar(im, cax=cax)
-
-    # saving plot
-    plt.savefig(f'Plots/Jacobi_{condition}_{N}N_Slice.png')
-    plt.show()
-    
-    return 0
-
-def jacobi_field(data, condition):
-
-    # reshaping stored 2D matrix data back into 3D matrix
-    phi = data.reshape(N, N, N)
-
-    # calculating vector field for either point charge or charged wire
-    if (condition=='electric'):
-        x, y, z = Grad(phi, dx)
-        scale1 = 0.7
-
-    elif (condition=='magnetic'): 
-        x, y, z = Curl(phi, dx)
-        scale1 = 1
-
-    # ploting vector field
-    plt.title(f'Normalised Jacobi {condition} Field, N=100', pad=16, fontsize=16)
-    plt.quiver(x, y, scale_units='xy', scale=scale1)
-    plt.xlabel('X-Axis', fontsize=12)
-    plt.ylabel('Y-Axis', fontsize=12)
-    plt.xlim([40,60])
-    plt.ylim([40,60])
-    
-    # saving plot
-    plt.savefig(f'Plots/Jacobi_{condition}_{N}N_Field.png')
-    plt.show()
-
-    return 0
-
-def hilliard_freeEnergy():
-
-    # toggle plots for phi=0.0 or phi=0.5
-    # filename = 'Data_good/hilliard_100N_phi0.0.txt'
-    filename = 'Data_good/hilliard_100N_phi0.5.txt'
-
-    # extracting phi value
-    phi = float(filename[27:30])
-
-    # extracting data
-    rawData = np.loadtxt(filename)
-    time = rawData[:,0]
-    freeEnergy = rawData[:,1]
+    prob = correlation_1/correlation_2
 
     # setting up plot figure/titles/labels
     fig, ax = plt.subplots(1, 1, figsize=(7, 5))
 
-    ax.set_title(fr'Hilliard Free Energy Density $\phi$={phi}, N={N}', pad=16)
-    ax.errorbar(time, freeEnergy, marker='o', markersize = 4, linestyle='--', color='black')
-    ax.set_xlabel('Time [sweeps]')
-    ax.set_ylabel('Free Energy Density')
+    diff1 = np.linspace(0, 25, 25)
+
+    ax.set_title(fr'Matching Species Proabilites {N}x{N} Matrix', pad=16)
+    ax.errorbar(diff1, prob, marker='o', markersize = 4, linestyle='--', color='red')
+    ax.set_xlabel('Radius [-]')
+    ax.set_ylabel('Proability [-]')
+    plt.legend()
 
     # saving to plot to file
-    plt.savefig(f'Plots/hilliard_freeEnergy_phi{phi}_{N}N.png')
+    plt.savefig(f'Plots/MatchingSpecies_{N}N.png')
     plt.show()
 
+
+def PlotContour(matrix):
+
+    cmap = ListedColormap(['grey', 'red', 'green', 'dodgerblue'])
+    vmin=0
+    vmax=4
+
+    # set ups single plot
+    fig, ax = plt.subplots()
+    fig.suptitle(f'N={N} D={D} q={q} p={p} Time={sweeps}', fontsize=15)
+    plt.subplots_adjust(top=0.85, wspace=0.4, hspace=0.4)
+
+    # ploting point charge XY plane
+    ax.set_title(f'Matrix Snapshot')
+    im = ax.imshow(matrix, cmap=cmap, vmin=vmin, vmax=vmax)
+    ax.set_xlabel('X-Axis')
+    ax.set_ylabel('Y-Axis')
+
+    # ploting color bar for plot
+    divider = make_axes_locatable(ax)
+    cax = divider.append_axes("right", size="5%", pad=0.05)
+
+    plt.colorbar(im, cax=cax)
+
+    # saving plot
+    plt.savefig(f'Plots/Tao_Snapshot_{N}N_D{D}_q{q}_p{p}_sweep{sweeps}.png')
+    plt.show()
+    
     return 0
 
 
-def plotSORS():
+def PlotEvolution(data):
 
-    filename = 'Data_good/seidel_electric_50N_phi0.0.txt'
+    time = data[:,0]
+    a = data[:,1]
+    b = data[:,2]
+    c = data[:,3]
 
-    rawData = np.loadtxt(filename)
-    iterations = rawData[:,0]
-    omega = rawData[:,1]
-
+    # setting up plot figure/titles/labels
     fig, ax = plt.subplots(1, 1, figsize=(7, 5))
 
-    # finding omega which minimises the number of interations for convergence
-    min_iterations = np.min(iterations)
-    min_iter_idx = np.where(iterations == min_iterations)
-    min_omega = omega[min_iter_idx][0]
+    ax.set_title(fr'Evolution of Species {N}x{N} Matrix', pad=16)
+    ax.errorbar(time, a, marker='o', markersize = 4, linestyle='--', color='red', label='a')
+    ax.errorbar(time, b, marker='o', markersize = 4, linestyle='--', color='green', label='b')
+    ax.errorbar(time, c, marker='o', markersize = 4, linestyle='--', color='blue', label='c')
+    ax.set_xlabel('Time [sweeps]')
+    ax.set_ylabel('Fractional Concentration [-]')
+    plt.legend()
 
-    # setting figure title
-    ax.set_title(fr'Point Charge Gauss-Seidel SORS Algorithm Convergence, N=50', pad=16)
-    ax.errorbar(omega, iterations, marker='o', markersize = 4, linestyle='', color='black', label=f'Min $\omega$={min_omega}')
-    ax.set_ylabel('Number of Iterations [-]')
-    ax.set_xlabel('$\omega$ [-]')
+    # saving to plot to file
+    plt.savefig(f'Plots/SpeciesEvolution_{N}N.png')
+    plt.show()
+
+def PlotPoints(data):
+
+    time = data[:,0]
+    a1 = data[:,1]
+    a2 = data[:,2]
+
+    # setting up plot figure/titles/labels
+    fig, (ax1, ax2) = plt.subplots(1, 2, figsize=(10, 5))
+
+    fig.suptitle(f'N={N} D={D} q={q} p={p} Time={sweeps}', fontsize=15)
+    ax1.set_title(fr'Evolution of Points in A Species')
+    ax1.errorbar(time, a1, marker='o', markersize = 4, linestyle='--', color='black', label='point 1')
+    ax1.errorbar(time, a2, marker='o', markersize = 4, linestyle='--', color='orange', label='point 2')
+    ax1.set_xlabel('Time [sweeps]')
+    ax1.set_ylabel('A Matrix Species Value [-]')
+
+    peak_idx = find_peaks(a1)[0]
+    peak_values = a1[peak_idx]
+    peak_time = time[peak_idx]
+
+
+    ax2.set_title(fr'Best Fit for A Species Point')
+    ax2.errorbar(peak_time, peak_values, marker='o', markersize = 4, linestyle='--', color='black', label='point 1')
+    # ax2.errorbar(time, a2, marker='o', markersize = 4, linestyle='--', color='orange', label='point 2')
+    ax2.set_xlabel('Time [sweeps]')
+    ax2.set_ylabel('A Matrix Species Peaks [-]')
+
+
 
     plt.legend()
-    plt.savefig(f'Plots/seidel_electric_50N.png')
+
+    frequency = 1200/4
+
+    print(f'Period={np.round(1/frequency, 2)}')
+
+    # saving to plot to file
+    plt.savefig(f'Plots/A_Species_PointEvolution_{N}N.png')
     plt.show()
 
     return 0
+
+
+def CalcAbsorbingTime(time):
+
+    AbsorbTime = np.mean(time)
+    AbsorbTime_err = np.std(time)
+
+    data=open(f'Calculated_AbsorbingTime.txt','w')
+    data.write('{0:5.20s} {1:5.20s}\n'.format('Absorbing-Time', 'Error'))
+    data.write('{0:5.5e} {1:5.5e}\n'.format(AbsorbTime, AbsorbTime_err))
+    data.close()
+
+    print(fr'Absorbing Time = {np.round(AbsorbTime,2)}, Error={np.round(AbsorbTime_err,2)}')
+
 
 def main():
 
-    global N, dx
+    global N, D, q, p, sweeps
 
-    N = 100
-    dx = 1
+    N = 50
+    D = 0.5
+    q = 1
+    p = 2.5
+    sweeps = 2000
 
     # comment/uncomment desired file for plotting
-    # filename = "Data_good/Jacobi_magneticField_100N_phi0.5.txt"
-    filename = "Data_good/Jacobi_electricField_100N_phi0.5.txt"
+    # data = np.loadtxt("AbsorbtionTimeData_good.txt")
+    # data = np.loadtxt("Data/tao_frac_50N_D1.0_q1.0_p0.5_sweep1200.txt")
+    data = np.loadtxt("Data/Tao_Mat_50N_D0.5_q1.0_p2.5_good2.txt")
+    # data = np.loadtxt("Data/PointsTao_50N_D0.5_q1.0_p2.5_good.txt")
 
-    # sets condition as electric or magnetic data, i.e., uses point charge or charged wire data
-    condition = filename[17:25]
-    data = np.loadtxt(filename) 
-
+    
     # uncomment to use functions, they are all plotting functions
-    # hilliard_freeEnergy()
-    # jacobi_field(data, condition)
-    # jacobi_slice(data, condition)
-    # ExtractRadialData(data, condition)
-    # plotRadial(condition)
-    # plotSORS()
+    # PlotEvolution(data)
+    # PlotContour(data)
+    # CalcAbsorbingTime(data)
+    # PlotPoints(data)
+    correlation_prob(data)
 
     return 0
 

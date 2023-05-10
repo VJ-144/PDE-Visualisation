@@ -15,29 +15,52 @@ import time
 import sys
 
 
-def main():
-
-    # number of times the simulation is run, default is 1
-    NumOfRun = 1
-
-    # run conditions read in from terminal + offset noise
-    N, conditions = func.initialise_simulation()
-    offset = 0.1
-
-    # constant parameters
-    D, q, p = conditions
+def inital_conditions(N):
 
     a = np.random.uniform(low=0.00, high=0.3333, size=[N,N])
     b = np.random.uniform(low=0.00, high=0.3333, size=[N,N])
     c = np.random.uniform(low=0.00, high=0.3333, size=[N,N])
 
-    matrix = (a, b, c)
+    same=True
 
+    if (same):
+
+        a = np.random.uniform(low=0.00, high=0.3333, size=[N,N])
+        b = np.random.uniform(low=0.00, high=0.3333, size=[N,N])
+        c = np.random.uniform(low=0.00, high=0.3333, size=[N,N])
+
+        ab = np.allclose(a,b)
+        ac = np.allclose(a,c)
+        bc = np.allclose(b,c)
+        
+
+        if (ab==False and ac==False and bc==False): same=False
+
+    return (a, b, c)
+
+def main():
+
+    # run conditions read in from terminal + offset noise
+    N, conditions = func.initialise_simulation()
+
+    # constant parameters
+    D, q, p, Type = conditions
+
+    converged_sweeps = []
+
+    NumOfRun = 1
     for Run in range(NumOfRun):
 
+        matrix = inital_conditions(N)
 
         # returns converged 3D matrix of point charge or charged wire and number of iteration for convergence
-        phi_converged, interation = func.PDE_converge(N, conditions, matrix)
+        
+        sweeps, tao = func.PDE_converge(N, conditions, matrix)
+        converged_sweeps.append(sweeps)
+        np.savetxt(f'Data/Tao_Mat_{N}N_D{D}_q{q}_p{p}.txt', tao)
 
+        print(f'Simulation Run {Run} Complete')
+
+    np.savetxt('AbsorbtionTimeData.txt', converged_sweeps)
 
 main()

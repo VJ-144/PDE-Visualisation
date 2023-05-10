@@ -59,26 +59,28 @@ def initialise_simulation():
     """
 
     # checks number of command line arguments are correct otherwise stops simulation
-    if (len(sys.argv) <= 4 or len(sys.argv) > 5):
-        print("Error! \nFile Input: python IVP_Run.py N Phi field")
-        sys.exit()
+    # if (len(sys.argv) <= 4 or len(sys.argv) > 5):
+    #     print("Error! \nFile Input: python IVP_Run.py N Phi field")
+    #     sys.exit()
 
     # reads arguments from terminal command line
     N=int(sys.argv[1]) 
     D=float(sys.argv[2])
     q=float(sys.argv[3])
     p=float(sys.argv[4])
+    Type=str(sys.argv[5])
 
-    # # check if algorithm name from terminal  is valid
-    # valid_algorithm = False
-    # if (PDE=="jacobi" ): valid_algorithm = True
-    # elif (PDE=="hilliard"): valid_algorithm = True
-    # elif (PDE=="seidel"): valid_algorithm = True
+    # check if algorithm name from terminal  is valid
+    valid_algorithm = False
+    if (Type=="standard" ): valid_algorithm = True
+    elif (Type=="absorbing"): valid_algorithm = True
+    elif (Type=="points"): valid_algorithm = True
+    elif (Type=="prob"): valid_algorithm = True
 
     # # ends program if algorithm in invalid
-    # if (valid_algorithm == False):
-    #     print("Error! \nInvalid PDE Algorithm Parameter, choose from:\n1--hilliard\n2--jacobi\n3--seidel")
-    #     sys.exit()
+    if (valid_algorithm == False):
+        print("Error! \nInvalid Type Parameter, choose from:\n1--standard\n2--absorbing\n3--points\n4--prob")
+        sys.exit()
 
 
     # valid_field = False
@@ -91,11 +93,31 @@ def initialise_simulation():
     #     sys.exit()
 
 
-    conditions = (D, q, p)
+    conditions = (D, q, p, Type)
 
     # returns all imporant simulation parameters
     return N, conditions
 
+
+def GetTao(N, a, b, c):
+
+    tao = np.zeros(shape=(N,N), dtype=float)
+
+    for ij in itertools.product(range(N), repeat=2):
+
+        i,j = ij
+
+        a_cell = a[i,j] 
+        b_cell = b[i,j]
+        c_cell = c[i,j]
+        extra = (1 - a_cell - b_cell - c_cell)
+
+        if (a_cell > b_cell and a_cell > c_cell and a_cell > extra): tao[i,j] = 1
+        elif (b_cell > a_cell and b_cell > c_cell and b_cell > extra): tao[i,j] = 2
+        elif (c_cell > a_cell and c_cell > b_cell and c_cell > extra): tao[i,j] = 3
+        elif (extra > a_cell and extra > b_cell and extra> c_cell): tao[i,j] = 0
+
+    return tao
 
 
 def PDE_converge(N, conditions, matrix):
@@ -105,24 +127,27 @@ def PDE_converge(N, conditions, matrix):
     dt = 0.1
 
     # extracting constant parameters
-    D, q, p = conditions
+    D, q, p, Type = conditions
     a, b, c = matrix
 
-    tao = a + b + c 
+    tao = GetTao(N, a, b, c)
 
-    cmap = ListedColormap(['orange', 'red', 'yellow', 'dodgerblue'])
-    vmin = -2
-    vmax = 1
+    cmap = ListedColormap(['grey', 'red', 'green', 'dodgerblue'], N=4)
+    # cmap = ListedColormap(['red', 'green', 'dodgerblue'])
+    vmin=0
+    vmax=4
 
     # setting up animantion figure
-    fig = plt.figure()
+    fig, ax = plt.subplots()
     im=plt.imshow(tao, animated=True, cmap=cmap, vmin=vmin, vmax=vmax)
+    plt.colorbar(im, ax=ax)
 
     # number of sweeps and terminal display counter
-    nstep=1000000
+    nstep=2000
     sweeps = 0
 
-    # data=open(f'Data/hilliard_{N}N_phi{phi_param}.txt','w')
+    if (Type=='points'): data=open(f'Data/PointsTao_{N}N_D{D}_q{q}_p{p}.txt','w')
+    else: data=open(f'Data/tao_frac_{N}N_D{D}_q{q}_p{p}.txt','w')
 
     for n in range(nstep):
 
@@ -135,16 +160,7 @@ def PDE_converge(N, conditions, matrix):
         b_new = b + ((D*dt)/(dx**2)) * laplacian_b + dt*q*b*(1-a-b-c) - dt*p*a*b
         c_new = c + ((D*dt)/(dx**2)) * laplacian_c + dt*q*c*(1-a-b-c) - dt*p*b*c
 
-        abc = a_new + b_new + c_new
-        tao_new = Laplacian(abc)
-
-
-        # tao_new = nabla(abc, dt)
-
-        # print('tao')
-        # print(tao_new)
-        # print('a')
-        # print(a_new)           
+        tao_new = GetTao(N, a_new, b_new, c_new)        
 
         a = a_new.copy()
         b = b_new.copy()
@@ -160,15 +176,40 @@ def PDE_converge(N, conditions, matrix):
             # animates configuration 
             plt.cla()
             im=plt.imshow(tao_new, animated=True, cmap=cmap, vmin=vmin, vmax=vmax)
+            # plt.colorbar(im, ax=ax)
             plt.draw()
             plt.pause(0.0001) 
 
-            # calculating free energy density
-            # energy_density = freeEnergy(phi0, N, conditions)
+            number_a_True = tao_new[tao_new==1]
+            Num_a = np.count_nonzero(number_a_True)
+            a_frac = Num_a/N**2
+
+            number_b_True = tao_new[tao_new==2]
+            Num_b = np.count_nonzero(number_b_True )
+            b_frac = Num_b/N**2
+
+            number_c_True = tao_new[tao_new==3]
+            Num_c = np.count_nonzero(number_c_True )
+            c_frac = Num_c/N**2 
 
             # saving time and free energy density data
-            # data.write('{0:5.5e} {1:5.5e}\n'.format(sweeps, energy_density))
+            if (Type=='standard'): 
+                data.write('{0:5.5e} {1:5.5e} {2:5.5e} {3:5.5e}\n'.format(sweeps, a_frac, b_frac, c_frac))
 
-    # data.close()
 
-    return phi0
+            if (Type=='absorbing'):
+                if (a_frac>=1 or b_frac>=1 or c_frac>=1):
+                    print('system converged')
+                    return sweeps*dt, tao_new
+
+                if (sweeps*dt>=1000): 
+                    print('system unconverged')
+                    sys.exit()
+
+            if (Type=='points'): 
+                data.write('{0:5.5e} {1:5.5e} {2:5.5e}\n'.format(sweeps, a[int(N/2), int(N/2)], a[int(N/4), int(N/4)]))
+                
+
+    data.close()
+
+    return sweeps, tao_new
