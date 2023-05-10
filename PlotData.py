@@ -106,66 +106,125 @@ def plotRadial():
     plt.show()
 
 
-def phi_average(data):
+def PlotAverage(data):
 
     # extracting data
     time = data[:,0]
-    average = data[:,1]
+    phi_avg = data[:,1]
+    m_avg = data[:,2]
+
 
     # setting up plot figure/titles/labels
-    fig, ax = plt.subplots(1, 1, figsize=(7, 5))
+    fig, (ax1, ax2) = plt.subplots(1,2, figsize=(10,4))
+    fig.suptitle(fr'{Algorithm} Algorithm - Average Solution Evolution, {N}x{N} Matrix, $\alpha$={alpha}', fontsize=16)
+    # fig.suptitle(fr'{Algorithm} Algorithm - Average Solution Evolution, {N}x{N} Matrix', fontsize=16)
+    plt.subplots_adjust(top=0.8, wspace=0.3, hspace=0.4)
 
-    ax.set_title(fr'Average $\phi$ Evolution {N}x{N} Matrix', pad=16)
-    ax.errorbar(time, average, marker='o', markersize = 4, linestyle='--', color='black')
-    ax.set_xlabel('Time [sweeps]')
-    ax.set_ylabel('Average $\phi$')
+    ax1.set_title(fr'$\phi$={phi0} Solution Evolution')
+    ax1.errorbar(time, phi_avg, marker='o', markersize = 4, linestyle='--', color='black')
+    ax1.set_xlabel('Time [sweeps]')
+    ax1.set_ylabel('Solution Average [-]')
+
+    ax2.set_title(fr'm Solution Evolution, $\chi$={chi}')
+    ax2.errorbar(time, m_avg, marker='o', markersize = 4, linestyle='--', color='black')
+    ax2.set_xlabel('Time [sweeps]')
+    ax2.set_ylabel('Solution Average [-]')
 
     # saving to plot to file
-    # plt.savefig(f'Plots/{Algorithm}Average_T{sweeps}_v0{v0}.png')
-    plt.savefig(f'Plots/{Algorithm}Average_T{sweeps}_omega{omega}_kappa{kappa}.png')
+    plt.savefig(f'Plots/{Algorithm}Average_{N}N_phi{phi0}_chi_{chi}_Time{sweeps}.png')
+    plt.savefig(f'Plots/{Algorithm}Average_{N}N_phi{phi0}_chi_{chi}_Time{sweeps}_{alpha}.png')
     plt.show()
 
-def plotContour(matrix):
 
-    fig, ax = plt.subplots(1, 1, figsize=(7, 5))
+def PlotPhase(alpha, avg, var, symbol):
 
-    ax.set_title(fr'{Algorithm} Algorithm at Time={sweeps}, N={N}', pad=16)
-    ax.set_xlabel('X-Axis')
-    ax.set_ylabel('Y-Axis')
+    # setting up plot figure/titles/labels
+    fig, (ax1, ax2) = plt.subplots(1,2, figsize=(10,4))
+    fig.suptitle(fr'{Algorithm} Algorithm - $\alpha$ Evolution, {N}x{N} Matrix', fontsize=16)
+    # fig.suptitle(fr'{Algorithm} Algorithm - Average Solution Evolution, {N}x{N} Matrix', fontsize=16)
+    plt.subplots_adjust(top=0.8, wspace=0.3, hspace=0.4)
 
-    im = ax.imshow(matrix, origin='lower', extent=[0,1,0,1], cmap='gnuplot')
-    fig.colorbar(im, ax=ax, orientation='vertical')
+    ax1.set_title(fr'{symbol} Solution Average')
+    ax1.errorbar(alpha, avg, marker='o', markersize = 4, linestyle='--', color='black')
+    ax1.set_xlabel(fr'$\alpha$ [-]')
+    ax1.set_ylabel('Solution Average [-]')
 
-    plt.savefig(f'Plots/{Algorithm}Snapshot_T{sweeps}_v0{v0}.png')
-    # plt.savefig(f'Plots/{Algorithm}Snapshot_T{sweeps}_omega{omega}_kappa{kappa}.png')
+    ax2.set_title(fr'{symbol} Solution Varience')
+    ax2.errorbar(alpha, var, marker='o', markersize = 4, linestyle='--', color='black')
+    ax2.set_xlabel(fr'$\alpha$ [-]')
+    ax2.set_ylabel('Solution Varience [-]')
+
+    # saving to plot to file
+    plt.savefig(f'Plots/VariedAlpha_{N}N_{symbol}.png')
+    plt.show()
+
+def plotContour(matrix1, matrix2):
+        
+    # set ups two plots
+    fig, (ax1, ax2) = plt.subplots(1,2, figsize=(10,4))
+    fig.suptitle(fr'{Algorithm} Algorithm - Average Solution Evolution, {N}x{N} Matrix, $\alpha$={alpha}', fontsize=16)
+    # fig.suptitle(f'Standard Algorithm {N}x{N} Matrix', fontsize=16)
+    plt.subplots_adjust(top=0.8, wspace=0.1, hspace=0.4)
+
+    # ploting charged wire ZY plane
+    ax1.set_title(fr'$\phi$={phi0} Solution', pad=15)
+    ax1.imshow(matrix1, cmap='gnuplot')
+    ax1.set_xlabel('X-Axis')
+    ax1.set_ylabel('Y-Axis')
+
+    # ploting charged wire XY plane
+    ax2.set_title(f'm Solution, $\chi$={chi}', pad=15)
+    im = ax2.imshow(matrix2, cmap='gnuplot')
+    ax2.set_xlabel('X-Axis')
+    ax2.set_ylabel('Y-Axis')
+
+    # ploting color bars for both plots
+    divider1 = make_axes_locatable(ax1)
+    cax1 = divider1.append_axes("right", size="5%", pad=0.05)
+
+    divider2 = make_axes_locatable(ax2)
+    cax2 = divider2.append_axes("right", size="5%", pad=0.05)
+
+    plt.colorbar(im, cax=cax1)
+    plt.colorbar(im, cax=cax2)
+
+    # plt.savefig(f'Plots/{Algorithm}Snapshot_{N}N_phi{phi0}_chi_{chi}_Time{sweeps}.png')
+    plt.savefig(f'Plots/{Algorithm}Snapshot_{N}N_phi{phi0}_chi_{chi}_Time{sweeps}_alpha{alpha}.png')
     plt.show()
 
 def main():
 
-    global N, dx, omega, kappa, Algorithm, sweeps, v0
+    global N, dx, phi0, chi, sweeps, Algorithm, alpha
 
     N = 50
     dx = 1
-    omega=10
-    kappa=0.01
-    sweeps = 5000
-    v0 = 0.5
+    phi0=0.5
+    chi=0.3
+    sweeps = 2000
+    alpha=0.005
 
     # Algorithm = 'Standard'
-    Algorithm = 'Velocity'
+    Algorithm = 'Reaction'
 
-    # data = np.loadtxt('Data/standardDiffusion_Evol_50N_omega10.0_kappa0.01_time5000.txt')
-    # data = np.loadtxt('Data/standardDiffusion_Mat_50N_omega10.0_kappa0.1_time5000.txt')
 
-    # data = np.loadtxt('Data/velocityDiffusion_Evol_50N_omega10.0_kappa0.01_time5000_v00.01.txt')
-    data = np.loadtxt('Data/velocityDiffusion_Mat_50N_omega10.0_kappa0.01_time5000_v00.5.txt')
+    # data1 = np.loadtxt('Data/standardPhi_Mat_50N_phi0.5_chi_0.3_Time5000.txt')
+    # data2 = np.loadtxt('Data/standardMag_Mat_50N_phi0.5_chi_0.3_Time5000.txt')
 
+    data1 = np.loadtxt('Data/reaction/reactionPhi_Mat_50N_phi0.5_chi_0.3_Time2500_alpha0.005.txt')
+    data2 = np.loadtxt('Data/reaction/reactionMag_Mat_50N_phi0.5_chi_0.3_Time2500_alpha0.005.txt')
+
+    # data1 = np.loadtxt('Data/Varied_Alpha/reaction_Evol_50N_Varied_Alpha_Time2500_feedbackIn.txt')
+    # alpha = data1[:,0]
+    # m_avg = data1[:,3]
+    # m_var = data1[:,4]
+    # symbol = 'm'
 
     # uncomment to use functions, they are all plotting functions
-    # phi_average(data)
-    plotContour(data)    
+    # PlotAverage(data1)
+    plotContour(data1, data2)    
     # ExtractRadialData(data)
     # plotRadial()
+    # PlotPhase(alpha, m_avg, m_var, symbol)
 
 
     return 0

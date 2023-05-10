@@ -41,118 +41,86 @@ def initialise_simulation():
     Sets up all parameters for the simulation + reads arguments from terminal
     """
 
-    # checks number of command line arguments are correct otherwise stops simulation
-    if (len(sys.argv) < 5 or len(sys.argv) > 6):
-        print("Error! \nFile Input: python RunCode.py N omega kappa v0 Algorithm")
-        sys.exit()
+    # # checks number of command line arguments are correct otherwise stops simulation
+    # if (len(sys.argv) < 5 or len(sys.argv) > 6):
+    #     print("Error! \nFile Input: python RunCode.py N omega kappa v0 Algorithm")
+    #     sys.exit()
 
     # reads arguments from terminal command line
     N=int(sys.argv[1]) 
-    omega=float(sys.argv[2])
-    kappa=float(sys.argv[3])
-    v0 = float(sys.argv[4])
-    algorithm = str(sys.argv[5])
+    phi0=float(sys.argv[2])
+    chi=float(sys.argv[3])
+    algorithm = str(sys.argv[4])
+    alpha = float(sys.argv[5])
+    Batch = str(sys.argv[6])
 
     # ends program if incorrect algorithm is input
     valid_algorithm = True
     if (algorithm=='standard'): valid_algorithm=False
-    elif (algorithm=='velocity'): valid_algorithm=False
+    elif (algorithm=='reaction'): valid_algorithm=False
     if (valid_algorithm):
         print('Error: invalid algorithm input')
         sys.exit()
 
-    conditions = (omega, kappa, v0, algorithm)
+    conditions = (phi0, chi, algorithm, alpha, Batch)
 
     # returns all imporant simulation parameters
     return N, conditions
 
 
 
-def source_matrix(omega, N):
-
-    # initial positiona/source matrix
-    rho = np.zeros(shape=(N,N), dtype=float)
-
-    half_size = int(N/2)
-
-    # calculates all radius and all source matrix elements
-    for ij in itertools.product(range(N), repeat=2):
-
-        i,j =ij
-
-        # calculate radius vector coordinates
-        xx = np.abs(i-half_size)
-        yy = np.abs(j-half_size)
-
-        # calcuating radius magnitude
-        Radius = np.sqrt(xx**2 + yy**2)
-
-        rho[i,j] = np.exp( -(Radius**2)/(omega**2) )
-
-    return rho
-
-def vel_dependence(v0, N, dx):
-
-    vel_mat = np.zeros(shape=(N,N), dtype=float)
-
-    half_size = int(N/2)
-
-    # calculates all contributions of velocity adjustment to algorithm
-    for ij in itertools.product(range(N), repeat=2):
-
-        i,j = ij
-
-        # calculate radius vector coordinates
-        xx = np.abs(i-half_size)
-        yy = np.abs(j-half_size)
-
-        factor = -v0 * np.sin((2*np.pi*yy)/N)/2*dx
-
-        vel_mat[i,j] = factor
-
-    return vel_mat
-
-def diff_equation(N, conditions, phi0, nstep):
+def diff_equation(N, conditions, phi, m, nstep):
 
     # extracting constant parameters
-    omega, kappa, v0, algorithm = conditions
+    phi0, chi, algorithm, alpha, Batch = conditions
 
     # they must converge based on the condition: dt/dx < 1/2
     dt=0.2
     dx=1
-    D=1
+    a = 0.1
+    c = 0.1
+    kappa = 0.1
+    M = 0.1
+    D = 1
+    phi_bar = 0.5
 
     # setting up animantion figure
     fig = plt.figure()
-    im=plt.imshow(phi0, animated=True)
+
+    im=plt.imshow(m, animated=True)
 
     # number of sweeps and terminal display counter
     sweeps = 0
 
-    # calculate position vector squared
-    rho = source_matrix(omega, N)
-
-    data=open(f'Data/{algorithm}Diffusion_Evol_{N}N_omega{omega}_kappa{kappa}_time{nstep}_v0{v0}.txt','w')
-
-    # calculates contribution to algorithm for velocity dependence
+    
+    data=open(f'Data/{algorithm}/{algorithm}_Evol_{N}N_phi{phi0}_chi_{chi}_Time{nstep}_alpha{alpha}.txt','w')
+    
     algorithm_factor = 0
-    if (algorithm=='velocity'): vel = vel_dependence(v0, N, dx)
 
     for n in range(nstep):
 
         # calculating laplacian with np.roll
-        laplacian_phi0 = Laplacian(phi0)
+        laplacian_phi = Laplacian(phi)
 
-        # calculating new factor based on velocity algorithm
-        if (algorithm=='velocity'): algorithm_factor = vel * (np.roll(phi0, -1, axis=1) - np.roll(phi0, 1, axis=1))
+        # calculating chemical potential matrix
+        chem_pot = -a * phi + a * phi**3 - (chi/2) * m**2 - kappa * laplacian_phi
 
-        phi0_new = phi0 + ((dt*D)/dx**2) * laplacian_phi0 + (dt * rho) - (dt * kappa * phi0) + algorithm_factor
+        laplacian_chem = Laplacian(chem_pot)
 
-        # feeding phi back into algorithm
-        phi0 = phi0_new.copy()
+        if (algorithm=='reaction'): algorithm_factor = alpha * (phi - phi_bar)
+
+        phi_new = phi + ((dt*M)/dx**2) * laplacian_chem - algorithm_factor*dt
+
+        laplacian_m = Laplacian(m)
+
+        m_new = m + ((dt*D)/dx**2) * laplacian_m - dt*((c-chi*phi)*m + c*m**3)
+
+        # feeding phi and m back into algorithm
+        phi = phi_new.copy()
+        m = m_new.copy()
 
         # visuals in set number of sweeps
-        if(n%10==0): 
+        if(n%10==0 and n>=500): 
 
             # prints current number of sweep to terminal
             sweeps += 10
@@ -160,16 +128,16 @@ def diff_equation(N, conditions, phi0, nstep):
 
             # animates configuration 
             plt.cla()
-            im=plt.imshow(phi0, animated=True)
+            im=plt.imshow(m, animated=True)
             plt.draw()
             plt.pause(0.0001) 
 
             # calculating average
-            phi0_avg = np.mean(phi0)
+            phi_avg = np.mean(phi)
+            m_avg = np.mean(m)
 
-            # saving time and free energy density data
-            data.write('{0:5.5e} {1:5.5e}\n'.format(sweeps, phi0_avg))
+            data.write('{0:5.5e} {1:5.5e} {2:5.5e}\n'.format(sweeps, phi_avg, m_avg))
 
     data.close()
 
-    return phi0
+    return phi, m
