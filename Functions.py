@@ -19,6 +19,36 @@ import matplotlib.pyplot as plt
 import matplotlib.animation as animation
 from matplotlib.colors import ListedColormap
 
+def correlation_prob(tao, N, correlation_1, arrayLength):
+
+    # correlation_1 = np.zeros(shape=(int(N/2)))
+    # arrayLength = np.zeros(shape=(int(N/2)))
+
+    radius_list = []
+
+    center = int(N/2)
+
+    for ij in itertools.product(range(int(N/2)), repeat=2):
+
+        i,j = ij
+
+        cell_rowCenter = tao[i, center]
+
+        cell1 = tao[i,j]
+        
+        xdiff = np.abs(center - j)
+        
+        radius_list.append(xdiff)
+
+        if (cell1==cell_rowCenter):
+            correlation_1[xdiff] +=1
+
+        arrayLength[xdiff] +=1
+
+    prob = correlation_1/arrayLength
+
+    return prob
+
 
 def Laplacian(phi0):
     """
@@ -26,7 +56,7 @@ def Laplacian(phi0):
     """
 
     # calculates laplacian Y and X componets for full matrix + center all correction
-    yGrad_comp = np.roll(phi0, -1, axis =0) + np.roll(phi0, 1, axis=0)
+    yGrad_comp = np.roll(phi0, -1, axis =0) + np.roll(phi0, 1, axis =0)
     xGrad_comp = np.roll(phi0, -1, axis =1) + np.roll(phi0, 1, axis =1)
     center_corr = -4 * phi0
 
@@ -42,7 +72,7 @@ def nabla(phi0, dt):
     """
 
     # calculates laplacian Y and X componets for full matrix + center all correction
-    yGrad_comp = np.roll(phi0, -1, axis =0) - np.roll(phi0, 1, axis=0)
+    yGrad_comp = np.roll(phi0, -1, axis =0) - np.roll(phi0, 1, axis =0)
     xGrad_comp = np.roll(phi0, -1, axis =1) - np.roll(phi0, 1, axis =1)
 
     # calculates laplacian
@@ -133,7 +163,6 @@ def PDE_converge(N, conditions, matrix):
     tao = GetTao(N, a, b, c)
 
     cmap = ListedColormap(['grey', 'red', 'green', 'dodgerblue'], N=4)
-    # cmap = ListedColormap(['red', 'green', 'dodgerblue'])
     vmin=0
     vmax=4
 
@@ -143,11 +172,15 @@ def PDE_converge(N, conditions, matrix):
     plt.colorbar(im, ax=ax)
 
     # number of sweeps and terminal display counter
-    nstep=2000
+    nstep=200
     sweeps = 0
 
     if (Type=='points'): data=open(f'Data/PointsTao_{N}N_D{D}_q{q}_p{p}.txt','w')
     else: data=open(f'Data/tao_frac_{N}N_D{D}_q{q}_p{p}.txt','w')
+
+
+    correlation_1 = np.zeros(shape=(int(N/2)))
+    arrayLength = np.zeros(shape=(int(N/2)))
 
     for n in range(nstep):
 
@@ -156,9 +189,9 @@ def PDE_converge(N, conditions, matrix):
         laplacian_b = Laplacian(b)
         laplacian_c = Laplacian(c)
 
-        a_new = a + ((D*dt)/(dx**2)) * laplacian_a + dt*q*a*(1-a-b-c) - dt*p*a*c
-        b_new = b + ((D*dt)/(dx**2)) * laplacian_b + dt*q*b*(1-a-b-c) - dt*p*a*b
-        c_new = c + ((D*dt)/(dx**2)) * laplacian_c + dt*q*c*(1-a-b-c) - dt*p*b*c
+        a_new = a + dt*((D/(dx**2)) * laplacian_a + q*a*(1-a-b-c) - p*a*c)
+        b_new = b + dt*((D/(dx**2)) * laplacian_b + q*b*(1-a-b-c) - p*a*b)
+        c_new = c + dt*((D/(dx**2)) * laplacian_c + q*c*(1-a-b-c) - p*b*c)
 
         tao_new = GetTao(N, a_new, b_new, c_new)        
 
@@ -207,8 +240,18 @@ def PDE_converge(N, conditions, matrix):
                     sys.exit()
 
             if (Type=='points'): 
-                data.write('{0:5.5e} {1:5.5e} {2:5.5e}\n'.format(sweeps, a[int(N/2), int(N/2)], a[int(N/4), int(N/4)]))
+                point1 = a_new[int(N/2), int(N/2)]
+                point2 = a_new[int(N/4), int(N/4)]
+                data.write('{0:5.5e} {1:5.5e} {2:5.5e}\n'.format(sweeps*dt, point1, point2))
+
+            if (Type=='prob'):
+                prob = 0
+                prob += correlation_prob(tao, N, correlation_1, arrayLength)
                 
+
+
+    if (Type=='prob'):
+        np.savetxt('correlationData.txt', prob)
 
     data.close()
 
